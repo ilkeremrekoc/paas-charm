@@ -129,16 +129,64 @@ class PrometheusConfig(BaseModel):
         return self
 
 
+class CustomCOSPathsConfig(BaseModel):
+    """Custom COS (Canonical Observability Stack) paths configuration.
+
+    Attributes:
+        grafana_dashboards_path: Path to custom Grafana dashboards directory.
+        prometheus_alert_rules_path: Path to custom Prometheus alert rules file.
+        loki_alert_rules_path: Path to custom Loki alert rules file.
+        model_config: Pydantic model configuration.
+    """
+
+    grafana_dashboards_path: str | None = Field(
+        default=None, description="Path to custom Grafana dashboards"
+    )
+    prometheus_alert_rules_path: str | None = Field(
+        default=None, description="Path to custom Prometheus alert rules"
+    )
+    loki_alert_rules_path: str | None = Field(
+        default=None, description="Path to custom Loki alert rules"
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def validate_paths(self) -> "CustomCOSPathsConfig":
+        """Validate that paths are not empty strings if provided.
+
+        Returns:
+            The validated CustomCOSPathsConfig instance.
+
+        Raises:
+            ValueError: If any path is an empty string.
+        """
+        for field_name in [
+            "grafana_dashboards_path",
+            "prometheus_alert_rules_path",
+            "loki_alert_rules_path",
+        ]:
+            value = getattr(self, field_name)
+            if value is not None and not value.strip():
+                raise ValueError(f"{field_name} cannot be an empty string")
+
+        return self
+
+
 class PaasConfig(BaseModel):
     """Configuration from paas-config.yaml file.
 
     Attributes:
         prometheus: Prometheus-related configuration.
+        custom_cos_paths: Custom COS (Canonical Observability Stack) paths configuration.
         model_config: Pydantic model configuration.
     """
 
     prometheus: PrometheusConfig | None = Field(
         default=None, description="Prometheus configuration"
+    )
+    custom_cos_paths: CustomCOSPathsConfig | None = Field(
+        default=None, description="Custom COS paths configuration"
     )
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)

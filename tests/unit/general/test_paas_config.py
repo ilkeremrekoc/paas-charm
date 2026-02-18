@@ -14,12 +14,167 @@ from pydantic import ValidationError
 from paas_charm.exceptions import PaasConfigError
 from paas_charm.paas_config import (
     CONFIG_FILE_NAME,
+    CustomCOSPathsConfig,
     PaasConfig,
     PrometheusConfig,
     ScrapeConfig,
     StaticConfig,
     read_paas_config,
 )
+
+
+class TestCustomCOSPathsConfig:
+    """Tests for CustomCOSPathsConfig Pydantic model."""
+
+    def test_valid_config_all_none(self):
+        """Test valid config with all paths set to None (default)."""
+        config = CustomCOSPathsConfig()
+        assert config.grafana_dashboards_path is None
+        assert config.prometheus_alert_rules_path is None
+        assert config.loki_alert_rules_path is None
+
+    def test_valid_config_with_grafana_dashboards_path(self):
+        """Test valid config with only grafana_dashboards_path set."""
+        config = CustomCOSPathsConfig(grafana_dashboards_path="/custom/grafana")
+        assert config.grafana_dashboards_path == "/custom/grafana"
+        assert config.prometheus_alert_rules_path is None
+        assert config.loki_alert_rules_path is None
+
+    def test_valid_config_with_prometheus_alert_rules_path(self):
+        """Test valid config with only prometheus_alert_rules_path set."""
+        config = CustomCOSPathsConfig(prometheus_alert_rules_path="/custom/prometheus")
+        assert config.grafana_dashboards_path is None
+        assert config.prometheus_alert_rules_path == "/custom/prometheus"
+        assert config.loki_alert_rules_path is None
+
+    def test_valid_config_with_loki_alert_rules_path(self):
+        """Test valid config with only loki_alert_rules_path set."""
+        config = CustomCOSPathsConfig(loki_alert_rules_path="/custom/loki")
+        assert config.grafana_dashboards_path is None
+        assert config.prometheus_alert_rules_path is None
+        assert config.loki_alert_rules_path == "/custom/loki"
+
+    def test_valid_config_with_all_paths(self):
+        """Test valid config with all paths set."""
+        config = CustomCOSPathsConfig(
+            grafana_dashboards_path="/custom/grafana",
+            prometheus_alert_rules_path="/custom/prometheus",
+            loki_alert_rules_path="/custom/loki",
+        )
+        assert config.grafana_dashboards_path == "/custom/grafana"
+        assert config.prometheus_alert_rules_path == "/custom/prometheus"
+        assert config.loki_alert_rules_path == "/custom/loki"
+
+    def test_invalid_empty_string_grafana_dashboards_path(self):
+        """Test that empty string for grafana_dashboards_path is rejected."""
+        with pytest.raises(ValidationError) as exc_info:
+            CustomCOSPathsConfig(grafana_dashboards_path="")
+        errors = exc_info.value.errors()
+        assert len(errors) == 1
+        assert "grafana_dashboards_path" in str(errors[0]["ctx"]["error"])
+        assert "cannot be an empty string" in str(errors[0]["ctx"]["error"])
+
+    def test_invalid_empty_string_prometheus_alert_rules_path(self):
+        """Test that empty string for prometheus_alert_rules_path is rejected."""
+        with pytest.raises(ValidationError) as exc_info:
+            CustomCOSPathsConfig(prometheus_alert_rules_path="")
+        errors = exc_info.value.errors()
+        assert len(errors) == 1
+        assert "prometheus_alert_rules_path" in str(errors[0]["ctx"]["error"])
+        assert "cannot be an empty string" in str(errors[0]["ctx"]["error"])
+
+    def test_invalid_empty_string_loki_alert_rules_path(self):
+        """Test that empty string for loki_alert_rules_path is rejected."""
+        with pytest.raises(ValidationError) as exc_info:
+            CustomCOSPathsConfig(loki_alert_rules_path="")
+        errors = exc_info.value.errors()
+        assert len(errors) == 1
+        assert "loki_alert_rules_path" in str(errors[0]["ctx"]["error"])
+        assert "cannot be an empty string" in str(errors[0]["ctx"]["error"])
+
+    def test_invalid_whitespace_only_grafana_dashboards_path(self):
+        """Test that whitespace-only string for grafana_dashboards_path is rejected."""
+        with pytest.raises(ValidationError) as exc_info:
+            CustomCOSPathsConfig(grafana_dashboards_path="   ")
+        errors = exc_info.value.errors()
+        assert len(errors) == 1
+        assert "grafana_dashboards_path" in str(errors[0]["ctx"]["error"])
+
+    def test_invalid_whitespace_only_prometheus_alert_rules_path(self):
+        """Test that whitespace-only string for prometheus_alert_rules_path is rejected."""
+        with pytest.raises(ValidationError) as exc_info:
+            CustomCOSPathsConfig(prometheus_alert_rules_path="  \n  ")
+        errors = exc_info.value.errors()
+        assert len(errors) == 1
+        assert "prometheus_alert_rules_path" in str(errors[0]["ctx"]["error"])
+
+    def test_invalid_whitespace_only_loki_alert_rules_path(self):
+        """Test that whitespace-only string for loki_alert_rules_path is rejected."""
+        with pytest.raises(ValidationError) as exc_info:
+            CustomCOSPathsConfig(loki_alert_rules_path="\t  ")
+        errors = exc_info.value.errors()
+        assert len(errors) == 1
+        assert "loki_alert_rules_path" in str(errors[0]["ctx"]["error"])
+
+    def test_invalid_multiple_empty_strings(self):
+        """Test that multiple empty strings are all rejected."""
+        with pytest.raises(ValidationError) as exc_info:
+            CustomCOSPathsConfig(
+                grafana_dashboards_path="",
+                prometheus_alert_rules_path="",
+                loki_alert_rules_path="",
+            )
+        errors = exc_info.value.errors()
+        assert len(errors) == 1
+        # The validator will fail on the first empty string it encounters
+
+    def test_validator_checks_all_fields(self):
+        """Test that validator iterates through all field names."""
+        # Test with prometheus_alert_rules_path empty (second in list)
+        with pytest.raises(ValidationError) as exc_info:
+            CustomCOSPathsConfig(
+                grafana_dashboards_path="/valid/path",
+                prometheus_alert_rules_path="",
+            )
+        assert "prometheus_alert_rules_path" in str(exc_info.value)
+
+        # Test with loki_alert_rules_path empty (third in list)
+        with pytest.raises(ValidationError) as exc_info:
+            CustomCOSPathsConfig(
+                grafana_dashboards_path="/valid/path",
+                prometheus_alert_rules_path="/another/valid",
+                loki_alert_rules_path="",
+            )
+        assert "loki_alert_rules_path" in str(exc_info.value)
+
+    def test_validator_on_success(self):
+        """Test that validator returns self when validation passes."""
+        config = CustomCOSPathsConfig(
+            grafana_dashboards_path="/valid/grafana",
+            prometheus_alert_rules_path="/valid/prometheus",
+            loki_alert_rules_path="/valid/loki",
+        )
+        # Validation should pass and return a valid config
+        assert config.grafana_dashboards_path == "/valid/grafana"
+        assert config.prometheus_alert_rules_path == "/valid/prometheus"
+        assert config.loki_alert_rules_path == "/valid/loki"
+
+    def test_extra_field_forbidden(self):
+        """Test that extra fields are forbidden."""
+        with pytest.raises(ValidationError) as exc_info:
+            CustomCOSPathsConfig(unknown_field="value")
+        errors = exc_info.value.errors()
+        assert any("extra" in str(err["type"]) for err in errors)
+
+    def test_valid_paths_with_leading_trailing_whitespace(self):
+        """Test that paths with leading/trailing spaces are valid (not stripped)."""
+        config = CustomCOSPathsConfig(
+            grafana_dashboards_path="  /custom/grafana  ",
+            prometheus_alert_rules_path=" /custom/prometheus ",
+        )
+        # Paths should be preserved as-is (not stripped by validator)
+        assert config.grafana_dashboards_path == "  /custom/grafana  "
+        assert config.prometheus_alert_rules_path == " /custom/prometheus "
 
 
 class TestPaasConfig:
@@ -29,6 +184,7 @@ class TestPaasConfig:
         """Test valid minimal configuration (empty)."""
         config = PaasConfig()
         assert config.prometheus is None
+        assert config.custom_cos_paths is None
 
     def test_valid_config_with_prometheus(self):
         """Test valid configuration with prometheus section."""
@@ -43,6 +199,35 @@ class TestPaasConfig:
         assert config.prometheus.scrape_configs is not None
         assert len(config.prometheus.scrape_configs) == 1
         assert config.prometheus.scrape_configs[0].job_name == "test"
+        assert config.custom_cos_paths is None
+
+    def test_valid_config_with_custom_cos_paths(self):
+        """Test valid configuration with custom_cos_paths section."""
+        config = PaasConfig(
+            custom_cos_paths={
+                "grafana_dashboards_path": "/custom/grafana",
+                "prometheus_alert_rules_path": "/custom/prometheus",
+            }
+        )
+        assert config.prometheus is None
+        assert config.custom_cos_paths is not None
+        assert config.custom_cos_paths.grafana_dashboards_path == "/custom/grafana"
+        assert config.custom_cos_paths.prometheus_alert_rules_path == "/custom/prometheus"
+        assert config.custom_cos_paths.loki_alert_rules_path is None
+
+    def test_valid_config_with_all_sections(self):
+        """Test valid configuration with all sections."""
+        config = PaasConfig(
+            prometheus={
+                "scrape_configs": [
+                    {"job_name": "test", "static_configs": [{"targets": ["*:8000"]}]}
+                ]
+            },
+            custom_cos_paths={"grafana_dashboards_path": "/custom/grafana"},
+        )
+        assert config.prometheus is not None
+        assert config.custom_cos_paths is not None
+        assert config.custom_cos_paths.grafana_dashboards_path == "/custom/grafana"
 
     def test_extra_fields_forbidden(self):
         """Test that extra fields are not allowed."""
@@ -60,6 +245,7 @@ class TestReadPaasConfig:
         config = read_paas_config(tmp_path)
         assert config == PaasConfig()
         assert config.prometheus is None
+        assert config.custom_cos_paths is None
 
     def test_valid_config_file(self, tmp_path):
         """Test reading a valid config file."""
@@ -80,6 +266,7 @@ class TestReadPaasConfig:
         config = read_paas_config(tmp_path)
         assert config == PaasConfig()
         assert config.prometheus is None
+        assert config.custom_cos_paths is None
 
     def test_file_with_only_whitespace_returns_empty_config(self, tmp_path):
         """Test that file with only whitespace returns empty PaasConfig."""
@@ -90,6 +277,7 @@ class TestReadPaasConfig:
         config = read_paas_config(tmp_path)
         assert config == PaasConfig()
         assert config.prometheus is None
+        assert config.custom_cos_paths is None
 
     def test_invalid_yaml_raises_error(self, tmp_path):
         """Test that invalid YAML raises PaasConfigError."""
@@ -150,12 +338,54 @@ class TestReadPaasConfig:
                     }
                 ]
             },
+            "custom_cos_paths": {
+                "grafana_dashboards_path": "/custom/grafana",
+                "prometheus_alert_rules_path": "/custom/prometheus",
+                "loki_alert_rules_path": "/custom/loki",
+            },
         }
         with config_path.open("w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
         config = read_paas_config(tmp_path)
         assert config.prometheus is not None
+        assert config.custom_cos_paths is not None
+        assert config.custom_cos_paths.grafana_dashboards_path == "/custom/grafana"
+        assert config.custom_cos_paths.prometheus_alert_rules_path == "/custom/prometheus"
+        assert config.custom_cos_paths.loki_alert_rules_path == "/custom/loki"
+
+    def test_config_with_custom_cos_paths_only(self, tmp_path):
+        """Test reading a config file with only custom_cos_paths."""
+        config_path = tmp_path / CONFIG_FILE_NAME
+        config_data = {
+            "custom_cos_paths": {
+                "grafana_dashboards_path": "/my/grafana",
+            },
+        }
+        with config_path.open("w", encoding="utf-8") as f:
+            yaml.dump(config_data, f)
+
+        config = read_paas_config(tmp_path)
+        assert config.prometheus is None
+        assert config.custom_cos_paths is not None
+        assert config.custom_cos_paths.grafana_dashboards_path == "/my/grafana"
+        assert config.custom_cos_paths.prometheus_alert_rules_path is None
+        assert config.custom_cos_paths.loki_alert_rules_path is None
+
+    def test_config_with_empty_string_in_custom_cos_paths_rejected(self, tmp_path):
+        """Test that empty strings in custom_cos_paths are rejected."""
+        config_path = tmp_path / CONFIG_FILE_NAME
+        config_data = {
+            "custom_cos_paths": {
+                "grafana_dashboards_path": "",
+            },
+        }
+        with config_path.open("w", encoding="utf-8") as f:
+            yaml.dump(config_data, f)
+
+        with pytest.raises(PaasConfigError) as exc_info:
+            read_paas_config(tmp_path)
+        assert "Invalid" in str(exc_info.value)
 
 
 class TestStaticConfig:

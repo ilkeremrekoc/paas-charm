@@ -13,7 +13,7 @@ from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 
 from paas_charm.app import SCHEDULER_UNIT_NUMBER
-from paas_charm.paas_config import PrometheusConfig
+from paas_charm.paas_config import CustomCOSPathsConfig, PrometheusConfig
 from paas_charm.utils import build_k8s_unit_fqdn, enable_pebble_log_forwarding
 
 logger = logging.getLogger(__name__)
@@ -32,6 +32,7 @@ class Observability(ops.Object):
         metrics_target: str | None,
         metrics_path: str | None,
         prometheus_config: PrometheusConfig | None = None,
+        custom_cos_paths: CustomCOSPathsConfig | None = None,
     ):
         """Initialize a new instance of the Observability class.
 
@@ -44,15 +45,34 @@ class Observability(ops.Object):
             metrics_target: Target to scrape for metrics.
             metrics_path: Path to scrape for metrics.
             prometheus_config: Custom Prometheus configuration from paas-config.yaml.
+            custom_cos_paths: Custom COS paths configuration from paas-config.yaml.
         """
         super().__init__(charm, "observability")
         self._charm = charm
+
+        # Determine paths from custom_cos_paths or fall back to cos_dir defaults
+        prometheus_alert_rules_path = (
+            custom_cos_paths.prometheus_alert_rules_path
+            if custom_cos_paths and custom_cos_paths.prometheus_alert_rules_path
+            else os.path.join(cos_dir, "prometheus_alert_rules")
+        )
+        loki_alert_rules_path = (
+            custom_cos_paths.loki_alert_rules_path
+            if custom_cos_paths and custom_cos_paths.loki_alert_rules_path
+            else os.path.join(cos_dir, "loki_alert_rules")
+        )
+        grafana_dashboards_path = (
+            custom_cos_paths.grafana_dashboards_path
+            if custom_cos_paths and custom_cos_paths.grafana_dashboards_path
+            else os.path.join(cos_dir, "grafana_dashboards")
+        )
+
         jobs = build_prometheus_jobs(
             metrics_target, metrics_path, prometheus_config, charm.app.name, charm.model.name
         )
         self._metrics_endpoint = MetricsEndpointProvider(
             charm,
-            alert_rules_path=os.path.join(cos_dir, "prometheus_alert_rules"),
+            alert_rules_path=prometheus_alert_rules_path,
             jobs=jobs,
             relation_name="metrics-endpoint",
             refresh_event=[charm.on.config_changed, charm.on[container_name].pebble_ready],
@@ -73,7 +93,7 @@ class Observability(ops.Object):
 
                 self._logging = charms.loki_k8s.v0.loki_push_api.LogProxyConsumer(
                     charm,
-                    alert_rules_path=os.path.join(cos_dir, "loki_alert_rules"),
+                    alert_rules_path=loki_alert_rules_path,
                     container_name=container_name,
                     log_files=[str(log_file) for log_file in log_files],
                     relation_name="logging",
@@ -94,7 +114,7 @@ class Observability(ops.Object):
 
         self._grafana_dashboards = GrafanaDashboardProvider(
             charm,
-            dashboards_path=os.path.join(cos_dir, "grafana_dashboards"),
+            dashboards_path=grafana_dashboards_path,
             relation_name="grafana-dashboard",
         )
 
